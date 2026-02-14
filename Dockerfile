@@ -21,6 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY app.py .
 COPY test_app.py .
+COPY gunicorn.conf.py .
+
 RUN pytest -q
 
 
@@ -39,6 +41,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
   && rm -rf /wheels
 
 COPY app.py .
+COPY gunicorn.conf.py .
 
 USER appuser
 EXPOSE 8080
@@ -46,4 +49,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=2)" || exit 1
 
-CMD ["gunicorn", "-b", "0.0.0.0:8080", "--workers", "2", "--threads", "4", "--timeout", "30", "app:app"]
+CMD ["gunicorn", "-c", "gunicorn.conf.py", "app:app"]
