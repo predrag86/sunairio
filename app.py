@@ -1,6 +1,8 @@
 import logging
 import os
 import sys
+import signal
+import atexit
 import time
 import uuid
 import traceback
@@ -71,6 +73,37 @@ logger.info(
         "pid": os.getpid(),
     },
 )
+
+# ---- Shutdown logging (SIGTERM/SIGINT) ----
+_shutdown_logged = False
+
+def _log_shutdown(reason: str) -> None:
+    global _shutdown_logged
+    if _shutdown_logged:
+        return
+    _shutdown_logged = True
+
+    logger.info(
+        "shutdown",
+        extra={
+            **_base_log_fields(),
+            "type": "shutdown",
+            "reason": reason,
+            "pid": os.getpid(),
+        },
+    )
+
+def _handle_signal(signum, _frame):
+    # SIGTERM is the common Kubernetes termination signal
+    name = signal.Signals(signum).name if signum in [s.value for s in signal.Signals] else str(signum)
+    _log_shutdown(f"signal:{name}")
+
+# Log on normal interpreter exit as well (best effort)
+atexit.register(lambda: _log_shutdown("atexit"))
+
+signal.signal(signal.SIGTERM, _handle_signal)
+signal.signal(signal.SIGINT, _handle_signal)
+# -------------------------------------------
 
 @app.before_request
 def _before_request() -> None:
