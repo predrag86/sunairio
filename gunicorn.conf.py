@@ -6,7 +6,7 @@ threads = int(os.getenv("GUNICORN_THREADS", "4"))
 timeout = int(os.getenv("GUNICORN_TIMEOUT", "30"))
 
 # Send logs to container stdout/stderr
-accesslog = "-"
+#accesslog = "-"
 errorlog = "-"
 
 # JSON access log line (one line per request)

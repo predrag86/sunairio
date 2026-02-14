@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 from flask import Flask, jsonify, request, g
 from pythonjsonlogger import jsonlogger
 from config import Settings
+from werkzeug.exceptions import HTTPException
 
 
 app = Flask(__name__)
@@ -113,9 +114,15 @@ def _before_request() -> None:
 
 @app.after_request
 def _after_request(response):
+
+    # ---- Skip logging for liveness/readiness probes ----
+    if request.path in ("/healthz", "/readyz"):
+        response.headers["X-Request-ID"] = g.request_id
+        return response
+    # -----------------------------------------------------
+
     duration_ms = int((time.time() - g.start_time) * 1000)
 
-    # request context fields
     fields: Dict[str, Any] = {
         **_base_log_fields(),
         "type": "request",
@@ -131,13 +138,15 @@ def _after_request(response):
 
     logger.info("request", extra=fields)
 
-    # echo back for client correlation
     response.headers["X-Request-ID"] = g.request_id
     return response
 
-
 @app.errorhandler(Exception)
 def _handle_exception(e: Exception):
+    # Let Flask/werkzeug HTTP errors pass through with correct status codes
+    if isinstance(e, HTTPException):
+        return e
+
     err_msg = str(e) or e.__class__.__name__
 
     fields = {
@@ -156,8 +165,8 @@ def _handle_exception(e: Exception):
         fields["stacktrace"] = traceback.format_exc()
 
     logger.error("unhandled_exception", extra=fields)
-
     return jsonify({"error": "Internal Server Error"}), 500
+
 
 
 
@@ -193,6 +202,14 @@ def add():
 def healthz():
     return jsonify({"status": "ok"}), 200
 
+@app.get("/readyz")
+def readyz():
+    # If you later add dependencies (DB, cache, etc.), check them here.
+    return jsonify({"status": "ready"}), 200
+
+@app.get("/favicon.ico")
+def favicon():
+    return "", 204
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)
