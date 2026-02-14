@@ -16,9 +16,6 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      # -------------------------
-      # Python setup + pip cache
-      # -------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -33,15 +30,9 @@ jobs:
       - name: Run unit tests
         run: pytest -q
 
-      # -------------------------
-      # Docker buildx setup
-      # -------------------------
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # -------------------------
-      # Docker build (test stage)
-      # -------------------------
       - name: Docker build (test stage)
         uses: docker/build-push-action@v6
         with:
@@ -52,15 +43,33 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # -------------------------
-      # Docker build (runtime)
-      # -------------------------
       - name: Docker build (runtime stage)
         uses: docker/build-push-action@v6
         with:
           context: .
           target: runtime
           push: false
-          tags: add-service:${{ github.sha }}
+          load: true          # load into local docker so we can run it
+          tags: add-service:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Smoke test runtime container
+        run: |
+          docker run -d --rm -p 8080:8080 --name addsvc add-service:ci
+          python - <<'PY'
+          import time, urllib.request, json
+          for _ in range(30):
+              try:
+                  r = urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=2)
+                  if r.status == 200:
+                      break
+              except Exception:
+                  time.sleep(1)
+          else:
+              raise SystemExit("healthz never became ready")
+          r = urllib.request.urlopen("http://127.0.0.1:8080/add?left=5&right=2", timeout=2)
+          assert json.loads(r.read().decode()) == {"sum": 7}
+          print("smoke ok")
+          PY
+          docker stop addsvc

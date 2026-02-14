@@ -1,42 +1,46 @@
-# ---------- base: shared setup ----------
-FROM python:3.12-slim AS base
+# ---------- builder: build wheels for runtime deps ----------
+FROM python:3.12-slim AS builder
+WORKDIR /wheels
 
-WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+COPY requirements.txt .
+RUN pip wheel --no-cache-dir --wheel-dir /wheels -r requirements.txt
+
 
 # ---------- test: install dev deps + run tests ----------
-FROM base AS test
+FROM python:3.12-slim AS test
+WORKDIR /app
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
 COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY app.py .
 COPY test_app.py .
-
-# Run tests as part of this stage (useful in CI)
 RUN pytest -q
 
 
 # ---------- runtime: minimal image ----------
 FROM python:3.12-slim AS runtime
-
-# curl only for HEALTHCHECK
-RUN apt-get update \
-  && rm -rf /var/lib/apt/lists/*
-
-# non-root user
-RUN useradd --create-home --shell /usr/sbin/nologin appuser
-
 WORKDIR /app
 
-# Install only runtime deps
-COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
 
-# Copy only app code (no tests in runtime)
+RUN useradd --create-home --shell /usr/sbin/nologin appuser
+
+COPY requirements.txt .
+COPY --from=builder /wheels /wheels
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+  && rm -rf /wheels
+
 COPY app.py .
 
 USER appuser
-
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
