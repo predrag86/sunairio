@@ -12,6 +12,8 @@ from flask import Flask, jsonify, request, g
 from pythonjsonlogger import jsonlogger
 from config import Settings
 from werkzeug.exceptions import HTTPException
+from prometheus_client import Counter, Histogram, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import multiprocess
 
 
 app = Flask(__name__)
@@ -45,6 +47,29 @@ def setup_logging() -> None:
 
 setup_logging()
 logger = logging.getLogger(SERVICE_NAME)
+
+def _metrics_registry() -> CollectorRegistry:
+    # If PROMETHEUS_MULTIPROC_DIR is set, use multiprocess collector
+    if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
+        registry = CollectorRegistry()
+        multiprocess.MultiProcessCollector(registry)
+        return registry
+    return CollectorRegistry()
+
+METRICS_REGISTRY = _metrics_registry()
+HTTP_REQUESTS_TOTAL = Counter(
+    "http_requests_total",
+    "Total HTTP requests",
+    ["method", "path", "status"],
+    registry=METRICS_REGISTRY,
+)
+
+HTTP_REQUEST_DURATION_SECONDS = Histogram(
+    "http_request_duration_seconds",
+    "HTTP request duration in seconds",
+    ["method", "path"],
+    registry=METRICS_REGISTRY,
+)
 
 def _get_request_id() -> str:
     # Common headers set by proxies/ingress/gateways
@@ -114,15 +139,29 @@ def _before_request() -> None:
 
 @app.after_request
 def _after_request(response):
+    duration_s = max(0.0, time.time() - g.start_time)
 
-    # ---- Skip logging for liveness/readiness probes ----
-    if request.path in ("/healthz", "/readyz"):
-        response.headers["X-Request-ID"] = g.request_id
+    # Always return request id header
+    response.headers["X-Request-ID"] = g.request_id
+
+    # Skip logging + metrics for probes + metrics endpoint
+    if request.path in ("/healthz", "/readyz", "/metrics"):
         return response
-    # -----------------------------------------------------
 
-    duration_ms = int((time.time() - g.start_time) * 1000)
+    # ---- metrics ----
+    HTTP_REQUESTS_TOTAL.labels(
+        method=request.method,
+        path=request.path,
+        status=str(response.status_code),
+    ).inc()
 
+    HTTP_REQUEST_DURATION_SECONDS.labels(
+        method=request.method,
+        path=request.path,
+    ).observe(duration_s)
+
+    # ---- your existing structured request log (keep as-is) ----
+    duration_ms = int(duration_s * 1000)
     fields: Dict[str, Any] = {
         **_base_log_fields(),
         "type": "request",
@@ -135,10 +174,8 @@ def _after_request(response):
         "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
         "user_agent": request.headers.get("User-Agent"),
     }
-
     logger.info("request", extra=fields)
 
-    response.headers["X-Request-ID"] = g.request_id
     return response
 
 @app.errorhandler(Exception)
@@ -210,6 +247,11 @@ def readyz():
 @app.get("/favicon.ico")
 def favicon():
     return "", 204
+
+@app.get("/metrics")
+def metrics():
+    data = generate_latest(METRICS_REGISTRY)
+    return data, 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)

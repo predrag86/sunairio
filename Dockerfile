@@ -45,6 +45,9 @@ COPY app.py .
 COPY config.py .
 COPY gunicorn.conf.py .
 
+ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prom-metrics
+RUN mkdir -p /tmp/prom-metrics && chown -R appuser:appuser /tmp/prom-metrics
+
 USER appuser
 EXPOSE 8080
 

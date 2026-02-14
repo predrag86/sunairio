@@ -49,3 +49,9 @@ def test_request_id_header_present(client):
     resp = client.get("/add?left=5&right=2")
     assert resp.status_code == 200
     assert resp.headers.get("X-Request-ID")
+
+def test_metrics_endpoint(client):
+    resp = client.get("/metrics")
+    assert resp.status_code == 200
+    assert "text/plain" in resp.headers.get("Content-Type", "")
+    assert resp.data  # Should return some metrics data

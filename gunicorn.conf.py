@@ -1,4 +1,5 @@
 import os
+import shutil
 
 bind = "0.0.0.0:8080"
 workers = int(os.getenv("GUNICORN_WORKERS", "2"))
@@ -27,3 +28,9 @@ access_log_format = (
     '"user_agent":"%(a)s"'
     '}'
 )
+
+def on_starting(server):
+    d = os.getenv("PROMETHEUS_MULTIPROC_DIR")
+    if d:
+        shutil.rmtree(d, ignore_errors=True)
+        os.makedirs(d, exist_ok=True)
