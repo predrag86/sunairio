@@ -11,6 +11,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      security-events: write   # needed for SARIF upload (optional)
 
     steps:
       - name: Checkout
@@ -32,7 +33,6 @@ jobs:
           TESTING: "1"
         run: pytest -q
 
-
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -52,7 +52,7 @@ jobs:
           context: .
           target: runtime
           push: false
-          load: true          # load into local docker so we can run it
+          load: true          # load into local docker so Trivy and smoke test can use it
           tags: add-service:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -76,6 +76,38 @@ jobs:
           print("smoke ok")
           PY
           docker stop addsvc
+
+      # -------------------------
+      # Trivy scan (recommended): fail build on HIGH/CRITICAL (fixed) vulns
+      # -------------------------
+      - name: Trivy scan (runtime image)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: add-service:ci
+          format: table
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 1
+
+      # -------------------------
+      # Trivy scan (optional): upload SARIF to GitHub Security tab
+      # -------------------------
+      - name: Trivy scan (SARIF)
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: add-service:ci
+          format: sarif
+          output: trivy-results.sarif
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: 0
+
+      - name: Upload Trivy SARIF
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-results.sarif
 
       - name: Log in to GHCR
         if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
