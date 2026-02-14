@@ -9,15 +9,10 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  test-and-build:
+  python-checks:
     runs-on: ubuntu-latest
-
     permissions:
       contents: read
-      packages: write
-      security-events: write   # needed for SARIF upload (optional)
-      id-token: write
-
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +27,7 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
-      
+
       - name: Ruff (lint)
         run: ruff check .
 
@@ -46,6 +41,16 @@ jobs:
         env:
           TESTING: "1"
         run: pytest -q
+
+
+  docker:
+    runs-on: ubuntu-latest
+    needs: [python-checks]
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -66,7 +71,7 @@ jobs:
           context: .
           target: runtime
           push: false
-          load: true          # load into local docker so Trivy and smoke test can use it
+          load: true
           tags: add-service:ci
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -91,9 +96,34 @@ jobs:
           PY
           docker stop addsvc
 
-      # -------------------------
-      # Trivy scan (recommended): fail build on HIGH/CRITICAL (fixed) vulns
-      # -------------------------
+      - name: Save runtime image as artifact
+        run: |
+          docker save add-service:ci -o image.tar
+
+      - name: Upload runtime image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: runtime-image
+          path: image.tar
+          retention-days: 1
+
+
+  security:
+    runs-on: ubuntu-latest
+    needs: [docker]
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Download runtime image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: runtime-image
+
+      - name: Load runtime image
+        run: |
+          docker load -i image.tar
+
       - name: Trivy scan (runtime image)
         uses: aquasecurity/trivy-action@0.24.0
         with:
@@ -104,9 +134,6 @@ jobs:
           ignore-unfixed: true
           exit-code: 1
 
-      # -------------------------
-      # Trivy scan (optional): upload SARIF to GitHub Security tab
-      # -------------------------
       - name: Trivy scan (SARIF)
         uses: aquasecurity/trivy-action@0.24.0
         with:
@@ -122,10 +149,7 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
-      
-            # -------------------------
-      # SBOM (CycloneDX) for the runtime image
-      # -------------------------
+
       - name: Generate SBOM (CycloneDX)
         uses: aquasecurity/trivy-action@0.24.0
         with:
@@ -141,8 +165,22 @@ jobs:
           retention-days: 14
 
 
+  publish:
+    runs-on: ubuntu-latest
+    needs: [python-checks, docker, security]
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Log in to GHCR
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -150,7 +188,6 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Docker metadata (tags/labels)
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -162,7 +199,6 @@ jobs:
 
       - name: Build and push (runtime)
         id: push_runtime
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -173,16 +209,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Cosign (keyless) image signing
-      # -------------------------
       - name: Install Cosign
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         uses: sigstore/cosign-installer@v3
         with:
           cosign-release: "v2.2.4"
 
       - name: Sign image digest with Cosign (keyless)
-        if: github.event_name == 'push' && (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
         env:
           IMAGE: ghcr.io/${{ github.repository }}
           DIGEST: ${{ steps.push_runtime.outputs.digest }}
@@ -190,4 +222,3 @@ jobs:
           set -euo pipefail
           echo "Signing ${IMAGE}@${DIGEST}"
           cosign sign --yes "${IMAGE}@${DIGEST}"
-
