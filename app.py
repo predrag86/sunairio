@@ -130,10 +130,11 @@ def _handle_signal(signum, _frame):
     _log_shutdown(f"signal:{name}")
 
 # Log on normal interpreter exit as well (best effort)
-if not getattr(app, "testing", False):
+if not app.testing:
     atexit.register(lambda: _log_shutdown("atexit"))
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
+
 
 # -------------------------------------------
 
