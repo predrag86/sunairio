@@ -17,6 +17,7 @@ from prometheus_client import multiprocess
 
 
 app = Flask(__name__)
+app.config["TESTING"] = Settings.TESTING
 
 SERVICE_NAME = Settings.SERVICE_NAME
 ENVIRONMENT = Settings.ENVIRONMENT
@@ -130,7 +131,7 @@ def _handle_signal(signum, _frame):
     _log_shutdown(f"signal:{name}")
 
 # Log on normal interpreter exit as well (best effort)
-if not app.testing:
+if not Settings.TESTING:
     atexit.register(lambda: _log_shutdown("atexit"))
     signal.signal(signal.SIGTERM, _handle_signal)
     signal.signal(signal.SIGINT, _handle_signal)
