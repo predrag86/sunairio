@@ -94,11 +94,9 @@ def _after_request(response):
 
 @app.errorhandler(Exception)
 def _handle_exception(e: Exception):
-    # Structured error response
-    # (Don’t leak stack traces to clients by default)
     err_msg = str(e) or e.__class__.__name__
 
-    fields: Dict[str, Any] = {
+    fields = {
         **_base_log_fields(),
         "type": "error",
         "request_id": getattr(g, "request_id", None),
@@ -115,7 +113,9 @@ def _handle_exception(e: Exception):
 
     logger.error("unhandled_exception", extra=fields)
 
-    return jsonify({"error": "Internal Server Error", "request_id": getattr(g, "request_id", None)}), 500
+    # ✅ CLEAN API RESPONSE (no request_id in body)
+    return jsonify({"error": "Internal Server Error"}), 500
+
 
 
 def _parse_int_param(name: str) -> tuple[Optional[int], Optional[str]]:
@@ -136,13 +136,14 @@ def _parse_int_param(name: str) -> tuple[Optional[int], Optional[str]]:
 def add():
     left, err_left = _parse_int_param("left")
     if err_left:
-        return jsonify({"error": err_left, "request_id": g.request_id}), 400
+        return jsonify({"error": err_left}), 400
 
     right, err_right = _parse_int_param("right")
     if err_right:
-        return jsonify({"error": err_right, "request_id": g.request_id}), 400
+        return jsonify({"error": err_right}), 400
 
-    return jsonify({"sum": left + right, "request_id": g.request_id}), 200
+    return jsonify({"sum": left + right}), 200
+
 
 
 @app.get("/healthz")

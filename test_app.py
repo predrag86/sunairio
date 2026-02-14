@@ -11,6 +11,7 @@ def test_add_ok(client):
     resp = client.get("/add?left=5&right=2")
     assert resp.status_code == 200
     assert resp.get_json() == {"sum": 7}
+    assert resp.headers.get("X-Request-ID")
 
 def test_add_negative(client):
     resp = client.get("/add?left=-10&right=3")
@@ -45,7 +46,6 @@ def test_healthz(client):
     assert resp.get_json() == {"status": "ok"}
 
 def test_request_id_header_present(client):
-    resp = client.get("/healthz")
+    resp = client.get("/add?left=5&right=2")
     assert resp.status_code == 200
     assert resp.headers.get("X-Request-ID")
-
