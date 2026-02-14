@@ -8,24 +8,59 @@ jobs:
   test-and-build:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      # -------------------------
+      # Python setup + pip cache
+      # -------------------------
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+          cache: "pip"
 
-      - name: Install dependencies
+      - name: Install dependencies (dev)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -r requirements.txt -r requirements-dev.txt
 
       - name: Run unit tests
-        run: |
-          pytest -q
+        run: pytest -q
 
-      - name: Build Docker image
-        run: |
-          docker build -t add-service:${{ github.sha }} .
+      # -------------------------
+      # Docker buildx setup
+      # -------------------------
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # -------------------------
+      # Docker build (test stage)
+      # -------------------------
+      - name: Docker build (test stage)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: test
+          push: false
+          tags: add-service:test
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      # -------------------------
+      # Docker build (runtime)
+      # -------------------------
+      - name: Docker build (runtime stage)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          target: runtime
+          push: false
+          tags: add-service:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
