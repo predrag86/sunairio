@@ -1,20 +1,26 @@
+import atexit
 import logging
 import os
-import sys
 import signal
-import atexit
+import sys
 import time
-import uuid
 import traceback
-from typing import Any, Dict, Optional
+import uuid
+from typing import Any
 
-from flask import Flask, jsonify, request, g
+from flask import Flask, g, jsonify, request
+from prometheus_client import (
+    CONTENT_TYPE_LATEST,
+    CollectorRegistry,
+    Counter,
+    Histogram,
+    generate_latest,
+    multiprocess,
+)
 from pythonjsonlogger import jsonlogger
-from config import Settings
 from werkzeug.exceptions import HTTPException
-from prometheus_client import Counter, Histogram, CollectorRegistry, generate_latest, CONTENT_TYPE_LATEST
-from prometheus_client import multiprocess
 
+from config import Settings
 
 app = Flask(__name__)
 app.config["TESTING"] = Settings.TESTING
@@ -27,7 +33,6 @@ POD_NAMESPACE = Settings.POD_NAMESPACE
 
 LOG_LEVEL = Settings.LOG_LEVEL
 LOG_STACKTRACE = Settings.LOG_STACKTRACE
-
 
 
 def setup_logging() -> None:
@@ -49,6 +54,7 @@ def setup_logging() -> None:
 setup_logging()
 logger = logging.getLogger(SERVICE_NAME)
 
+
 def _metrics_registry() -> CollectorRegistry:
     # If PROMETHEUS_MULTIPROC_DIR is set, use multiprocess collector
     if os.getenv("PROMETHEUS_MULTIPROC_DIR"):
@@ -56,6 +62,7 @@ def _metrics_registry() -> CollectorRegistry:
         multiprocess.MultiProcessCollector(registry)
         return registry
     return CollectorRegistry()
+
 
 METRICS_REGISTRY = _metrics_registry()
 HTTP_REQUESTS_TOTAL = Counter(
@@ -72,6 +79,7 @@ HTTP_REQUEST_DURATION_SECONDS = Histogram(
     registry=METRICS_REGISTRY,
 )
 
+
 def _get_request_id() -> str:
     # Common headers set by proxies/ingress/gateways
     return (
@@ -82,7 +90,7 @@ def _get_request_id() -> str:
     )
 
 
-def _base_log_fields() -> Dict[str, Any]:
+def _base_log_fields() -> dict[str, Any]:
     return {
         "service": SERVICE_NAME,
         "env": ENVIRONMENT,
@@ -90,6 +98,7 @@ def _base_log_fields() -> Dict[str, Any]:
         "pod_name": POD_NAME,
         "pod_namespace": POD_NAMESPACE,
     }
+
 
 logger.info(
     "startup",
@@ -103,6 +112,7 @@ logger.info(
 
 # ---- Shutdown logging (SIGTERM/SIGINT) ----
 _shutdown_logged = False
+
 
 def _log_shutdown(reason: str) -> None:
     global _shutdown_logged
@@ -127,8 +137,11 @@ def _log_shutdown(reason: str) -> None:
 
 def _handle_signal(signum, _frame):
     # SIGTERM is the common Kubernetes termination signal
-    name = signal.Signals(signum).name if signum in [s.value for s in signal.Signals] else str(signum)
+    name = (
+        signal.Signals(signum).name if signum in [s.value for s in signal.Signals] else str(signum)
+    )
     _log_shutdown(f"signal:{name}")
+
 
 # Log on normal interpreter exit as well (best effort)
 if not Settings.TESTING:
@@ -138,6 +151,7 @@ if not Settings.TESTING:
 
 
 # -------------------------------------------
+
 
 @app.before_request
 def _before_request() -> None:
@@ -170,7 +184,7 @@ def _after_request(response):
 
     # ---- your existing structured request log (keep as-is) ----
     duration_ms = int(duration_s * 1000)
-    fields: Dict[str, Any] = {
+    fields: dict[str, Any] = {
         **_base_log_fields(),
         "type": "request",
         "request_id": g.request_id,
@@ -185,6 +199,7 @@ def _after_request(response):
     logger.info("request", extra=fields)
 
     return response
+
 
 @app.errorhandler(Exception)
 def _handle_exception(e: Exception):
@@ -213,9 +228,7 @@ def _handle_exception(e: Exception):
     return jsonify({"error": "Internal Server Error"}), 500
 
 
-
-
-def _parse_int_param(name: str) -> tuple[Optional[int], Optional[str]]:
+def _parse_int_param(name: str) -> tuple[int | None, str | None]:
     values = request.args.getlist(name)
     if len(values) == 0:
         return None, f"Missing query param '{name}'"
@@ -242,24 +255,27 @@ def add():
     return jsonify({"sum": left + right}), 200
 
 
-
 @app.get("/healthz")
 def healthz():
     return jsonify({"status": "ok"}), 200
+
 
 @app.get("/readyz")
 def readyz():
     # If you later add dependencies (DB, cache, etc.), check them here.
     return jsonify({"status": "ready"}), 200
 
+
 @app.get("/favicon.ico")
 def favicon():
     return "", 204
+
 
 @app.get("/metrics")
 def metrics():
     data = generate_latest(METRICS_REGISTRY)
     return data, 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8080, debug=False)

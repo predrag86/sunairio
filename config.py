@@ -1,5 +1,6 @@
 import os
 
+
 class Settings:
     SERVICE_NAME = os.getenv("SERVICE_NAME", "add-service")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
