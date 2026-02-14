@@ -1,4 +1,5 @@
 import logging
+import os
 import sys
 import time
 import uuid
@@ -42,7 +43,6 @@ def setup_logging() -> None:
 setup_logging()
 logger = logging.getLogger(SERVICE_NAME)
 
-
 def _get_request_id() -> str:
     # Common headers set by proxies/ingress/gateways
     return (
@@ -62,6 +62,15 @@ def _base_log_fields() -> Dict[str, Any]:
         "pod_namespace": POD_NAMESPACE,
     }
 
+logger.info(
+    "startup",
+    extra={
+        **_base_log_fields(),
+        "type": "startup",
+        "log_level": LOG_LEVEL,
+        "pid": os.getpid(),
+    },
+)
 
 @app.before_request
 def _before_request() -> None:
