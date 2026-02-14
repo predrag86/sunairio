@@ -109,15 +109,20 @@ def _log_shutdown(reason: str) -> None:
         return
     _shutdown_logged = True
 
-    logger.info(
-        "shutdown",
-        extra={
-            **_base_log_fields(),
-            "type": "shutdown",
-            "reason": reason,
-            "pid": os.getpid(),
-        },
-    )
+    try:
+        logger.info(
+            "shutdown",
+            extra={
+                **_base_log_fields(),
+                "type": "shutdown",
+                "reason": reason,
+                "pid": os.getpid(),
+            },
+        )
+    except Exception:
+        # stdout/stderr may already be closed during interpreter shutdown (e.g., pytest/CI)
+        pass
+
 
 def _handle_signal(signum, _frame):
     # SIGTERM is the common Kubernetes termination signal
@@ -125,10 +130,11 @@ def _handle_signal(signum, _frame):
     _log_shutdown(f"signal:{name}")
 
 # Log on normal interpreter exit as well (best effort)
-atexit.register(lambda: _log_shutdown("atexit"))
+if not getattr(app, "testing", False):
+    atexit.register(lambda: _log_shutdown("atexit"))
+    signal.signal(signal.SIGTERM, _handle_signal)
+    signal.signal(signal.SIGINT, _handle_signal)
 
-signal.signal(signal.SIGTERM, _handle_signal)
-signal.signal(signal.SIGINT, _handle_signal)
 # -------------------------------------------
 
 @app.before_request

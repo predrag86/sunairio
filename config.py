@@ -4,6 +4,7 @@ class Settings:
     SERVICE_NAME = os.getenv("SERVICE_NAME", "add-service")
     ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
     VERSION = os.getenv("VERSION", os.getenv("GITHUB_SHA", "unknown"))
+    TESTING = os.getenv("TESTING", "0") == "1"
 
     LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
     LOG_STACKTRACE = os.getenv("LOG_STACKTRACE", "0") == "1"
