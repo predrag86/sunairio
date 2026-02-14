@@ -95,7 +95,7 @@ jobs:
       # Trivy scan (recommended): fail build on HIGH/CRITICAL (fixed) vulns
       # -------------------------
       - name: Trivy scan (runtime image)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.34.0
         with:
           image-ref: add-service:ci
           format: table
@@ -108,7 +108,7 @@ jobs:
       # Trivy scan (optional): upload SARIF to GitHub Security tab
       # -------------------------
       - name: Trivy scan (SARIF)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.34.0
         with:
           image-ref: add-service:ci
           format: sarif
@@ -127,7 +127,7 @@ jobs:
       # SBOM (CycloneDX) for the runtime image
       # -------------------------
       - name: Generate SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@0.24.0
+        uses: aquasecurity/trivy-action@0.34.0
         with:
           image-ref: add-service:ci
           format: cyclonedx
