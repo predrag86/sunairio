@@ -1,5 +1,4 @@
 import logging
-import os
 import sys
 import time
 import uuid
@@ -8,17 +7,20 @@ from typing import Any, Dict, Optional
 
 from flask import Flask, jsonify, request, g
 from pythonjsonlogger import jsonlogger
+from config import Settings
+
 
 app = Flask(__name__)
 
-SERVICE_NAME = os.getenv("SERVICE_NAME", "add-service")
-ENVIRONMENT = os.getenv("ENVIRONMENT", "dev")
-VERSION = os.getenv("VERSION", os.getenv("GITHUB_SHA", "unknown"))
-POD_NAME = os.getenv("POD_NAME")
-POD_NAMESPACE = os.getenv("POD_NAMESPACE")
+SERVICE_NAME = Settings.SERVICE_NAME
+ENVIRONMENT = Settings.ENVIRONMENT
+VERSION = Settings.VERSION
+POD_NAME = Settings.POD_NAME
+POD_NAMESPACE = Settings.POD_NAMESPACE
 
-LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
-LOG_STACKTRACE = os.getenv("LOG_STACKTRACE", "0") == "1"
+LOG_LEVEL = Settings.LOG_LEVEL
+LOG_STACKTRACE = Settings.LOG_STACKTRACE
+
 
 
 def setup_logging() -> None:
@@ -113,7 +115,6 @@ def _handle_exception(e: Exception):
 
     logger.error("unhandled_exception", extra=fields)
 
-    # ✅ CLEAN API RESPONSE (no request_id in body)
     return jsonify({"error": "Internal Server Error"}), 500
 
 

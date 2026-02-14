@@ -20,6 +20,7 @@ COPY requirements.txt requirements-dev.txt ./
 RUN pip install --no-cache-dir -r requirements.txt -r requirements-dev.txt
 
 COPY app.py .
+COPY config.py .
 COPY test_app.py .
 COPY gunicorn.conf.py .
 
@@ -41,6 +42,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
   && rm -rf /wheels
 
 COPY app.py .
+COPY config.py .
 COPY gunicorn.conf.py .
 
 USER appuser
