@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.3](https://github.com/predrag86/sunairio/compare/v1.0.2...v1.0.3) (2026-02-15)
+
+
+### Bug Fixes
+
+* docker-publish-image ([#18](https://github.com/predrag86/sunairio/issues/18)) ([30e9534](https://github.com/predrag86/sunairio/commit/30e9534efc58f951ac2f828ce67fa424e50a93f3))
+
 ## [1.0.2](https://github.com/predrag86/sunairio/compare/v1.0.1...v1.0.2) (2026-02-15)
 
 
