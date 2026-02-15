@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.4](https://github.com/predrag86/sunairio/compare/v1.0.3...v1.0.4) (2026-02-15)
+
+
+### Bug Fixes
+
+* test-new-workflow ([#20](https://github.com/predrag86/sunairio/issues/20)) ([7732be6](https://github.com/predrag86/sunairio/commit/7732be6ae8ba7241a57345878b34ef8395075399))
+
 ## [1.0.3](https://github.com/predrag86/sunairio/compare/v1.0.2...v1.0.3) (2026-02-15)
 
 
