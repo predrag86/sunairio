@@ -174,7 +174,7 @@ cosign verify ghcr.io/predrag86/sunairio:1.0.0   --certificate-identity-regexp "
 
 4. **publish** (main/tags only)
    - Build & push runtime image to GHCR
-   - Cosign sign image digest
+   - Cosign sign image digest.
 
 ---
 
