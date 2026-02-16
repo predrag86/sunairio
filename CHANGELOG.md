@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.0.6](https://github.com/predrag86/sunairio/compare/v1.0.5...v1.0.6) (2026-02-16)
+
+
+### Bug Fixes
+
+* ci-trigger-fix ([#24](https://github.com/predrag86/sunairio/issues/24)) ([3267b2a](https://github.com/predrag86/sunairio/commit/3267b2af09db9ed4a8b439a66f9d7dc3dfac282b))
+
 ## [1.0.5](https://github.com/predrag86/sunairio/compare/v1.0.4...v1.0.5) (2026-02-15)
 
 
