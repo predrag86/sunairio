@@ -1,265 +1,216 @@
 # 🚀 Add Service
 
-Production-ready Python (Flask) web service demonstrating:
+Production-ready Python (Flask) web service with:
 
 - ✅ REST API (`/add`)
 - ✅ Structured JSON logging
 - ✅ Health & readiness probes (`/healthz`, `/readyz`)
 - ✅ Prometheus metrics (`/metrics`)
-- ✅ Docker multi-stage build
-- ✅ GitHub Actions CI (split into jobs)
-- ✅ Trivy vulnerability scanning + SARIF upload
-- ✅ SBOM generation (CycloneDX)
-- ✅ Cosign image signing (keyless OIDC, digest-based)
-- ✅ Dependabot grouped updates + auto-merge (patch)
-- ✅ Automated releases with **Release Please** + Conventional Commits enforcement
+- ✅ Multi-stage Docker build
+- ✅ CI optimized for PR-based validation
+- ✅ Automated releases via Release Please
+- ✅ Docker image publishing only on official releases
+- ✅ Trivy security scanning + SBOM
+- ✅ Cosign image signing (keyless)
 
 ---
 
-# 🏗 Architecture Overview
+# 🏗 Architecture Diagrams
+
+## 1️⃣ Runtime (Container Deployment)
 
 ```mermaid
 flowchart LR
-    Dev[Developer]
-    GH[GitHub Repo]
-    PR[Pull Request]
-    CC[Conventional Commits<br/>PR title check]
-    CI[GitHub Actions CI]
-    Py[python-checks<br/>Ruff / MyPy / Pytest]
-    Db[docker<br/>Build + Smoke]
-    Sec[security<br/>Trivy + SBOM]
-    Main[main branch]
-    RP[Release Please]
-    RPR[Release PR]
-    Tag[Git Tag vX.Y.Z]
-    Rel[GitHub Release<br/>Auto notes]
-    Pub[publish<br/>Push to GHCR]
-    Cos[Cosign sign<br/>digest-based]
-    Registry[(GHCR)]
-    Runtime[Container Runtime<br/>Kubernetes-ready]
-    Prom[Prometheus]
-    Logs[stdout JSON logs]
+  Client[Client / Browser / Curl]
+  Docker[Docker Runtime]
+  App[Flask app<br/>Gunicorn workers]
+  Logs[stdout JSON logs]
+  Prom[Prometheus]
+  Metrics[/metrics]
+  Health[/healthz]
+  Ready[/readyz]
 
-    Dev --> PR --> CC
-    CC --> CI
-    CI --> Py --> Db --> Sec
-    Sec --> Main
-    Main --> RP --> RPR --> Main
-    Main --> Tag --> Rel
-    Tag --> Pub --> Registry --> Cos
-    Registry --> Runtime --> Prom
-    Runtime --> Logs
+  Client --> Docker --> App
+  App --> Logs
+  Prom --> Metrics --> App
+  Docker --> Health --> App
+  Docker --> Ready --> App
 ```
 
 ---
 
-# 📦 API
+## 2️⃣ CI + Release Flow (Optimized)
 
-### `GET /add?left=5&right=2`
+```mermaid
+flowchart TB
+  Dev[Developer]
+  PR[Pull Request]
+  CC[Conventional Commit<br/>PR title]
+  CI[CI (full)]
+  Lint[Ruff]
+  Type[MyPy]
+  Tests[Pytest]
+  Build[Docker build + smoke]
+  Sec[Trivy + SBOM]
+  Merge[Merge to main]
+  Post[post-merge-smoke<br/>(light)]
+  RP[Release Please]
+  RPR[Release PR]
+  Tag[Tag vX.Y.Z]
+  Pub[Release Publish]
+  GHCR[(GHCR)]
+  Sign[Cosign sign<br/>digest]
+  Users[Deploy / Users]
 
-Returns:
-
-```json
-{
-  "sum": 7
-}
+  Dev --> PR --> CC --> CI
+  CI --> Lint
+  CI --> Type
+  CI --> Tests
+  CI --> Build
+  CI --> Sec
+  CI --> Merge --> Post
+  Merge --> RP --> RPR --> Merge
+  Merge --> Tag --> Pub --> GHCR --> Sign --> Users
 ```
 
-- `left` and `right` must be integers
-- Returns `400` on invalid input
-- Includes `X-Request-ID` header for correlation
+**Key idea:** Full validation happens on PRs; `main` gets a lightweight smoke run; images are built/pushed only on release tags.
 
 ---
 
-# 🩺 Health Endpoints
+# 🧪 CI / Release Behavior
 
-| Endpoint   | Purpose              |
-|------------|----------------------|
-| `/healthz` | Liveness probe       |
-| `/readyz`  | Readiness probe      |
-| `/metrics` | Prometheus metrics   |
+## 1️⃣ Pull Requests (full validation)
+When a PR is opened or updated:
+
+- Ruff (lint + format check)
+- MyPy (type check)
+- Pytest
+- Docker build (test + runtime)
+- Smoke test
+- Trivy scan
+- SBOM generation
+
+➡️ This is the **full validation gate**.
 
 ---
 
-# 📊 Prometheus Metrics
+## 2️⃣ Merge to `main` (light)
+After PR merge:
 
-Exposes (example):
+- Only a lightweight `post-merge-smoke` job runs
+- No heavy Docker rebuild
+- No Trivy scan
+- No SBOM regeneration
 
-- `http_requests_total`
-- `http_request_duration_seconds`
+This avoids duplicate work.
 
-Example:
+---
+
+## 3️⃣ Releases (publish only on official release tags)
+This repository uses **Release Please** + Conventional Commits.
+
+### How it works:
+
+1. You merge PRs with Conventional Commit titles:
+   - `feat: add X`
+   - `fix: bug`
+   - `feat!: breaking change`
+2. Release Please opens a **Release PR**
+3. You merge the Release PR
+4. Git tag `vX.Y.Z` is created
+5. `release-publish.yml` triggers
+6. Docker image is built and pushed to GHCR
+7. Image is signed with Cosign
+
+➡️ Docker images are published **only for official releases**.
+
+---
+
+# 🐳 Docker Images
+
+Images are published to:
+
+```
+ghcr.io/predrag86/sunairio
+```
+
+Tags created on release:
+
+- `v1.0.2`
+- `1.0.2`
+
+Pull example:
 
 ```bash
-curl http://localhost:8080/metrics
+docker pull ghcr.io/predrag86/sunairio:1.0.2
 ```
 
 ---
 
-# 🧾 Structured Logging
+# 🧪 Local Development
 
-- JSON logs to stdout
-- Includes: `request_id`, `service`, `env`, `version`, latency, etc.
-- Startup & shutdown events logged
-- Kubernetes-ready logging model
-
----
-
-# 🐳 Docker
-
-Multi-stage build:
-
-- `builder` → build wheels
-- `test` → run pytest
-- `runtime` → minimal production image
-
-Build locally:
+Run locally:
 
 ```bash
 docker build --target runtime -t add-service:local .
-```
-
-Run:
-
-```bash
 docker run --rm -p 8080:8080 add-service:local
 ```
 
-Try it:
+Test:
 
 ```bash
-curl -s http://127.0.0.1:8080/healthz
-curl -s "http://127.0.0.1:8080/add?left=5&right=2"
+curl "http://127.0.0.1:8080/add?left=5&right=2"
 ```
 
 ---
 
 # 🔐 Security
 
-## Trivy Image Scanning
+### Trivy
 - Scans OS + Python dependencies
-- Fails CI on HIGH/CRITICAL vulnerabilities (configurable)
+- Fails PR if HIGH/CRITICAL vulnerabilities are found
 
-## SBOM (CycloneDX)
-- Generated automatically in CI and uploaded as an artifact
+### SBOM
+- CycloneDX format
+- Uploaded as CI artifact
 
-## Cosign Signing (Keyless OIDC)
-Images pushed to GHCR are signed using GitHub OIDC identity (**digest-based signing**).
-
-Verify:
-
-```bash
-cosign verify ghcr.io/predrag86/sunairio:1.0.0   --certificate-identity-regexp "https://github.com/predrag86/sunairio/.*"   --certificate-oidc-issuer "https://token.actions.githubusercontent.com"
-```
+### Cosign
+- Keyless signing
+- Uses GitHub OIDC identity
+- Signs image digest
 
 ---
 
-# 🔄 CI Pipeline Jobs
+# 📊 Observability
 
-1. **python-checks**
-   - Ruff (lint + formatting check)
-   - MyPy
-   - Pytest
-
-2. **docker**
-   - Build test stage
-   - Build runtime image
-   - Smoke test container
-   - Upload image artifact
-
-3. **security**
-   - Trivy scan (table)
-   - Trivy SARIF upload (GitHub Security)
-   - SBOM generation + upload artifact
-
-4. **publish** (main/tags only)
-   - Build & push runtime image to GHCR
-   - Cosign sign image digest.
+- JSON structured logs to stdout
+- `X-Request-ID` header returned for every request
+- `/metrics` endpoint for Prometheus scraping
+- Probes: `/healthz` and `/readyz`
 
 ---
 
-# 🧩 Automated releases with Release Please
+# 🔄 Optimized CI Summary
 
-This repo uses **Release Please** to automate:
-- version bumping (based on Conventional Commits)
-- release PR creation
-- tag creation (`vX.Y.Z`)
-- GitHub Release creation with generated notes
-
-### Conventional Commit examples (use in PR titles)
-- `feat: add /readyz endpoint` → **minor** release bump
-- `fix: handle favicon without 500` → **patch** release bump
-- `feat!: change /add response format` → **major** release bump
-
-### How the release flow works
-1. You open a PR with a Conventional Commit style title.
-2. CI + Conventional Commits check must pass.
-3. Merge to `main`.
-4. Release Please opens/updates a **Release PR** (e.g. `chore(main): release 1.0.1`).
-5. Merge the Release PR → GitHub creates tag `v1.0.1` + a GitHub Release.
-6. Your existing pipeline runs on that tag to publish to GHCR and sign the digest.
+| Event | Full CI | Publish Image |
+|-------|---------|---------------|
+| PR opened/updated | ✅ | ❌ |
+| PR merged | ⚡ lightweight | ❌ |
+| Release PR merged | ⚡ lightweight | ❌ |
+| Release tag created | ❌ | ✅ |
 
 ---
 
-# ✅ How to update and test Release Please + release notes
+# 🏁 End-to-End Test of Release Flow
 
-## A) Apply the README update (this file)
-1. Replace your repo `README.md` with the updated one you downloaded.
-2. Commit and push (preferably via PR):
+To test the full process:
 
-```bash
-git checkout -b docs/readme-release-please
-git add README.md
-git commit -m "docs: update README with release automation"
-git push -u origin docs/readme-release-please
-```
-
-Open a PR and merge it.
-
-## B) Test Conventional Commits enforcement
-1. Open a test PR with a **bad** title like: `Update stuff`
-2. The workflow **Conventional Commits** should fail.
-3. Rename the PR title to: `docs: update readme`
-4. The workflow should pass.
-
-## C) Test automated tagging + generated release notes (end-to-end)
-1. Create a normal PR with a Conventional title, e.g.:
-
-   `fix: improve health endpoints`
-
-2. Merge it to `main`.
-3. Wait for **Release Please** to open a **Release PR**.
-4. Open that Release PR:
-   - you will see changelog/release notes content in the PR description/body
-5. Merge the Release PR.
-6. Verify:
-   - a new Git tag exists: `v1.0.1` (example)
-   - a GitHub Release exists with generated notes
-   - GHCR has a new image tag (depends on your metadata pattern; often `1.0.1` and/or `latest`)
-   - Cosign signature exists for the pushed digest
-
-### Quick checks (optional)
-- List tags locally:
-
-```bash
-git fetch --tags
-git tag --list | tail
-```
-
-- Pull the release image:
-
-```bash
-docker pull ghcr.io/predrag86/sunairio:1.0.1
-```
-
----
-
-# 🤖 Dependabot
-
-- Weekly dependency updates
-- Grouped runtime/dev updates
-- Patch updates auto-merge after CI passes
-- Minor/major updates require review
+1. Create feature branch
+2. Open PR with Conventional Commit title
+3. Merge PR
+4. Wait for Release Please PR
+5. Merge Release PR
+6. Pull new Docker image from GHCR
 
 ---
 
