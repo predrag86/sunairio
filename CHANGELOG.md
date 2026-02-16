@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/predrag86/sunairio/compare/v1.1.0...v1.1.1) (2026-02-16)
+
+
+### Bug Fixes
+
+* readme-fix ([#28](https://github.com/predrag86/sunairio/issues/28)) ([43566d4](https://github.com/predrag86/sunairio/commit/43566d4267959700ff5ebf7548192e96655da00c))
+
 ## [1.1.0](https://github.com/predrag86/sunairio/compare/v1.0.6...v1.1.0) (2026-02-16)
 
 
