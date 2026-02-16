@@ -26,9 +26,9 @@ flowchart LR
   App[Flask app<br/>Gunicorn workers]
   Logs[stdout JSON logs]
   Prom[Prometheus]
-  Metrics[/metrics]
-  Health[/healthz]
-  Ready[/readyz]
+  Metrics["/metrics"]
+  Health["/healthz"]
+  Ready["/readyz"]
 
   Client --> Docker --> App
   App --> Logs
@@ -43,24 +43,24 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-  Dev[Developer]
-  PR[Pull Request]
-  CC[Conventional Commit<br/>PR title]
-  CI[CI (full)]
-  Lint[Ruff]
-  Type[MyPy]
-  Tests[Pytest]
-  Build[Docker build + smoke]
-  Sec[Trivy + SBOM]
-  Merge[Merge to main]
-  Post[post-merge-smoke<br/>(light)]
-  RP[Release Please]
-  RPR[Release PR]
-  Tag[Tag vX.Y.Z]
-  Pub[Release Publish]
-  GHCR[(GHCR)]
-  Sign[Cosign sign<br/>digest]
-  Users[Deploy / Users]
+  Dev["Developer"]
+  PR["Pull Request"]
+  CC["Conventional Commit PR title"]
+  CI["CI full validation"]
+  Lint["Ruff lint"]
+  Type["MyPy type check"]
+  Tests["Pytest"]
+  Build["Docker build and smoke test"]
+  Sec["Trivy and SBOM"]
+  Merge["Merge to main"]
+  Post["Post merge smoke"]
+  RP["Release Please"]
+  RPR["Release PR"]
+  Tag["Tag vX.Y.Z"]
+  Pub["Release Publish workflow"]
+  GHCR["GHCR registry"]
+  Sign["Cosign sign digest"]
+  Users["Deploy"]
 
   Dev --> PR --> CC --> CI
   CI --> Lint
