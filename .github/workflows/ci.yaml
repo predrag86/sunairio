@@ -102,7 +102,7 @@ jobs:
         run: docker save add-service:ci -o image.tar
 
       - name: Upload runtime image artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: runtime-image
           path: image.tar
@@ -117,7 +117,7 @@ jobs:
       security-events: write
     steps:
       - name: Download runtime image artifact
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: runtime-image
 
@@ -158,7 +158,7 @@ jobs:
           output: sbom.cdx.json
 
       - name: Upload SBOM artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
