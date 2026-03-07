@@ -55,10 +55,10 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Docker build (test stage)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: test
@@ -68,7 +68,7 @@ jobs:
           cache-to: type=gha,mode=max
 
       - name: Docker build (runtime stage)
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: .
           target: runtime
@@ -125,7 +125,7 @@ jobs:
         run: docker load -i image.tar
 
       - name: Trivy scan (runtime image) - fail on HIGH/CRITICAL
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: add-service:ci
           format: table
@@ -135,7 +135,7 @@ jobs:
           exit-code: 1
 
       - name: Trivy scan (SARIF)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: add-service:ci
           format: sarif
@@ -151,7 +151,7 @@ jobs:
           sarif_file: trivy-results.sarif
 
       - name: Generate SBOM (CycloneDX)
-        uses: aquasecurity/trivy-action@0.34.1
+        uses: aquasecurity/trivy-action@0.35.0
         with:
           image-ref: add-service:ci
           format: cyclonedx
