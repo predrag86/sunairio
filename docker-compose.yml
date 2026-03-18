@@ -1,0 +1,26 @@
+version: "3.9"
+
+services:
+  jaeger:
+    image: jaegertracing/all-in-one:latest
+    container_name: jaeger
+    ports:
+      - "16686:16686"   # UI
+      - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      target: runtime
+    container_name: add-service
+    ports:
+      - "8080:8080"
+    environment:
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://jaeger:4318/v1/traces"
+      SERVICE_NAME: "add-service"
+      ENVIRONMENT: "local"
+      VERSION: "dev"
+    depends_on:
+      - jaeger
+    restart: unless-stopped
