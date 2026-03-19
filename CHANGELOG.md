@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/predrag86/sunairio/compare/v1.2.0...v1.3.0) (2026-03-19)
+
+
+### Features
+
+* added otel collector ([#35](https://github.com/predrag86/sunairio/issues/35)) ([8df01a2](https://github.com/predrag86/sunairio/commit/8df01a20b8221f10a4d9dda7b7bf861789486167))
+
 ## [1.2.0](https://github.com/predrag86/sunairio/compare/v1.1.1...v1.2.0) (2026-03-19)
 
 
