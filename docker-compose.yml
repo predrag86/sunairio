@@ -1,26 +1,34 @@
-version: "3.9"
-
 services:
   jaeger:
     image: jaegertracing/all-in-one:latest
-    container_name: jaeger
     ports:
       - "16686:16686"   # UI
+      - "4317:4317"     # OTLP gRPC
       - "4318:4318"     # OTLP HTTP
+    restart: unless-stopped
+
+  otel-collector:
+    image: otel/opentelemetry-collector:0.147.0
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    ports:
+      - "4319:4318"   # optional: expose collector OTLP HTTP to host for debugging
+    depends_on:
+      - jaeger
     restart: unless-stopped
 
   app:
     build:
       context: .
       target: runtime
-    container_name: add-service
     ports:
       - "8080:8080"
     environment:
-      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://jaeger:4318/v1/traces"
+      OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://otel-collector:4318/v1/traces"
       SERVICE_NAME: "add-service"
       ENVIRONMENT: "local"
       VERSION: "dev"
     depends_on:
-      - jaeger
+      - otel-collector
     restart: unless-stopped
