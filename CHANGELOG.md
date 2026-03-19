@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/predrag86/sunairio/compare/v1.1.1...v1.2.0) (2026-03-19)
+
+
+### Features
+
+* Added Otel ([#33](https://github.com/predrag86/sunairio/issues/33)) ([f6052f8](https://github.com/predrag86/sunairio/commit/f6052f81ad9f1f0f8fc30ef7ed975a06f64da27f))
+
 ## [1.1.1](https://github.com/predrag86/sunairio/compare/v1.1.0...v1.1.1) (2026-02-16)
 
 
