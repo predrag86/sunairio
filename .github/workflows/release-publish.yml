@@ -34,8 +34,8 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=ref,event=tag               # v1.0.2
-            type=semver,pattern={{version}}  # 1.0.2
+            type=ref,event=tag
+            type=semver,pattern={{version}}
           labels: |
             org.opencontainers.image.source=${{ github.repositoryUrl }}
             org.opencontainers.image.revision=${{ github.sha }}
