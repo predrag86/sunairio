@@ -5,11 +5,12 @@ import signal
 import sys
 import time
 import traceback
-import uuid
 import urllib.request
+import uuid
 from typing import Any
 
 from flask import Flask, g, jsonify, request
+from opentelemetry import trace
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -22,8 +23,6 @@ from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
 
 from config import Settings
-
-from opentelemetry import trace
 from otel import setup_otel
 
 app = Flask(__name__)
@@ -39,6 +38,7 @@ LOG_LEVEL = Settings.LOG_LEVEL
 LOG_STACKTRACE = Settings.LOG_STACKTRACE
 
 setup_otel(app, SERVICE_NAME, ENVIRONMENT, VERSION)
+
 
 def setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
@@ -291,6 +291,7 @@ def favicon():
 def metrics():
     data = generate_latest(METRICS_REGISTRY)
     return data, 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
 
 @app.get("/outbound-demo")
 def outbound_demo():
