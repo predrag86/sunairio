@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.1](https://github.com/predrag86/sunairio/compare/v1.3.0...v1.3.1) (2026-03-19)
+
+
+### Bug Fixes
+
+* fix pipeline ([#37](https://github.com/predrag86/sunairio/issues/37)) ([dfa98ab](https://github.com/predrag86/sunairio/commit/dfa98ab1685d5ebf3ecf99bd5a7682e3504fd5e7))
+
 ## [1.3.0](https://github.com/predrag86/sunairio/compare/v1.2.0...v1.3.0) (2026-03-19)
 
 
