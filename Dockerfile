@@ -23,6 +23,7 @@ COPY app.py .
 COPY config.py .
 COPY test_app.py .
 COPY gunicorn.conf.py .
+COPY otel.py .
 
 RUN pytest -q
 
@@ -44,6 +45,7 @@ RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.t
 COPY app.py .
 COPY config.py .
 COPY gunicorn.conf.py .
+COPY otel.py .
 
 ENV PROMETHEUS_MULTIPROC_DIR=/tmp/prom-metrics
 RUN mkdir -p /tmp/prom-metrics && chown -R appuser:appuser /tmp/prom-metrics

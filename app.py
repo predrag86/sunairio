@@ -5,10 +5,12 @@ import signal
 import sys
 import time
 import traceback
+import urllib.request
 import uuid
 from typing import Any
 
 from flask import Flask, g, jsonify, request
+from opentelemetry import trace
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -21,6 +23,7 @@ from pythonjsonlogger import jsonlogger
 from werkzeug.exceptions import HTTPException
 
 from config import Settings
+from otel import setup_otel
 
 app = Flask(__name__)
 app.config["TESTING"] = Settings.TESTING
@@ -33,6 +36,8 @@ POD_NAMESPACE = Settings.POD_NAMESPACE
 
 LOG_LEVEL = Settings.LOG_LEVEL
 LOG_STACKTRACE = Settings.LOG_STACKTRACE
+
+setup_otel(app, SERVICE_NAME, ENVIRONMENT, VERSION)
 
 
 def setup_logging() -> None:
@@ -91,12 +96,23 @@ def _get_request_id() -> str:
 
 
 def _base_log_fields() -> dict[str, Any]:
+    span = trace.get_current_span()
+    ctx = span.get_span_context() if span else None
+
+    trace_id = None
+    span_id = None
+    if ctx and ctx.is_valid:
+        trace_id = format(ctx.trace_id, "032x")
+        span_id = format(ctx.span_id, "016x")
+
     return {
         "service": SERVICE_NAME,
         "env": ENVIRONMENT,
         "version": VERSION,
         "pod_name": POD_NAME,
         "pod_namespace": POD_NAMESPACE,
+        "trace_id": trace_id,
+        "span_id": span_id,
     }
 
 
@@ -275,6 +291,13 @@ def favicon():
 def metrics():
     data = generate_latest(METRICS_REGISTRY)
     return data, 200, {"Content-Type": CONTENT_TYPE_LATEST}
+
+
+@app.get("/outbound-demo")
+def outbound_demo():
+    with urllib.request.urlopen("http://127.0.0.1:8080/healthz", timeout=2) as r:
+        status = r.status
+    return jsonify({"status": "ok", "downstream_status": status}), 200
 
 
 if __name__ == "__main__":
