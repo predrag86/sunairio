@@ -11,6 +11,7 @@ from typing import Any
 
 from flask import Flask, g, jsonify, request
 from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 from prometheus_client import (
     CONTENT_TYPE_LATEST,
     CollectorRegistry,
@@ -24,7 +25,6 @@ from werkzeug.exceptions import HTTPException
 
 from config import Settings
 from otel import setup_otel
-from opentelemetry.trace import Status, StatusCode
 
 app = Flask(__name__)
 app.config["TESTING"] = Settings.TESTING
