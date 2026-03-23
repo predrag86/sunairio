@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/predrag86/sunairio/compare/v1.3.1...v1.4.0) (2026-03-23)
+
+
+### Features
+
+* added distributed tracing ([#39](https://github.com/predrag86/sunairio/issues/39)) ([c829782](https://github.com/predrag86/sunairio/commit/c829782ea899c070aaeafa5e5db44cb456d5888e))
+
 ## [1.3.1](https://github.com/predrag86/sunairio/compare/v1.3.0...v1.3.1) (2026-03-19)
 
 
