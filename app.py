@@ -24,7 +24,6 @@ from werkzeug.exceptions import HTTPException
 
 from config import Settings
 from otel import setup_otel
-from opentelemetry import trace
 from opentelemetry.trace import Status, StatusCode
 
 app = Flask(__name__)
@@ -194,6 +193,13 @@ def _after_request(response):
         trace_id = format(ctx.trace_id, "032x")
         span_id = format(ctx.span_id, "016x")
 
+    # --- automatic span status from HTTP status ---
+    if span and ctx and ctx.is_valid:
+        if response.status_code >= 500:
+            span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
+        else:
+            span.set_status(Status(StatusCode.OK))
+
     # --- headers ---
     response.headers["X-Request-ID"] = g.request_id
 
@@ -203,7 +209,7 @@ def _after_request(response):
     if span_id:
         response.headers["X-Span-ID"] = span_id
 
-    # --- skip probes ---
+    # --- skip probe logging/metrics ---
     if request.path in ("/healthz", "/readyz", "/metrics"):
         return response
 
@@ -221,7 +227,7 @@ def _after_request(response):
 
     # --- logging ---
     duration_ms = int(duration_s * 1000)
-    fields: Dict[str, Any] = {
+    fields: dict[str, Any] = {
         **_base_log_fields(),
         "type": "request",
         "request_id": g.request_id,
@@ -233,6 +239,10 @@ def _after_request(response):
         "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
         "user_agent": request.headers.get("User-Agent"),
     }
+
+    logger.info("request", extra=fields)
+
+    return response
 
     logger.info("request", extra=fields)
 
@@ -286,19 +296,14 @@ def add():
         try:
             left, err_left = _parse_int_param("left")
             if err_left:
-                span.set_status(Status(StatusCode.ERROR, err_left))
-                span.set_attribute("error", True)
                 return jsonify({"error": err_left}), 400
 
             right, err_right = _parse_int_param("right")
             if err_right:
-                span.set_status(Status(StatusCode.ERROR, err_right))
-                span.set_attribute("error", True)
                 return jsonify({"error": err_right}), 400
 
             result = left + right
 
-            # useful attributes
             span.set_attribute("left", left)
             span.set_attribute("right", right)
             span.set_attribute("result", result)
