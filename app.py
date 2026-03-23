@@ -24,9 +24,12 @@ from werkzeug.exceptions import HTTPException
 
 from config import Settings
 from otel import setup_otel
+from opentelemetry import trace
+from opentelemetry.trace import Status, StatusCode
 
 app = Flask(__name__)
 app.config["TESTING"] = Settings.TESTING
+tracer = trace.get_tracer(__name__)
 
 SERVICE_NAME = Settings.SERVICE_NAME
 ENVIRONMENT = Settings.ENVIRONMENT
@@ -97,13 +100,14 @@ def _get_request_id() -> str:
 
 def _base_log_fields() -> dict[str, Any]:
     span = trace.get_current_span()
-    ctx = span.get_span_context() if span else None
+    span_context = span.get_span_context()
 
     trace_id = None
     span_id = None
-    if ctx and ctx.is_valid:
-        trace_id = format(ctx.trace_id, "032x")
-        span_id = format(ctx.span_id, "016x")
+
+    if span_context and span_context.is_valid:
+        trace_id = format(span_context.trace_id, "032x")
+        span_id = format(span_context.span_id, "016x")
 
     return {
         "service": SERVICE_NAME,
@@ -179,14 +183,31 @@ def _before_request() -> None:
 def _after_request(response):
     duration_s = max(0.0, time.time() - g.start_time)
 
-    # Always return request id header
+    # --- tracing context ---
+    span = trace.get_current_span()
+    ctx = span.get_span_context() if span else None
+
+    trace_id = None
+    span_id = None
+
+    if ctx and ctx.is_valid:
+        trace_id = format(ctx.trace_id, "032x")
+        span_id = format(ctx.span_id, "016x")
+
+    # --- headers ---
     response.headers["X-Request-ID"] = g.request_id
 
-    # Skip logging + metrics for probes + metrics endpoint
+    if trace_id:
+        response.headers["X-Trace-ID"] = trace_id
+
+    if span_id:
+        response.headers["X-Span-ID"] = span_id
+
+    # --- skip probes ---
     if request.path in ("/healthz", "/readyz", "/metrics"):
         return response
 
-    # ---- metrics ----
+    # --- metrics ---
     HTTP_REQUESTS_TOTAL.labels(
         method=request.method,
         path=request.path,
@@ -198,9 +219,9 @@ def _after_request(response):
         path=request.path,
     ).observe(duration_s)
 
-    # ---- your existing structured request log (keep as-is) ----
+    # --- logging ---
     duration_ms = int(duration_s * 1000)
-    fields: dict[str, Any] = {
+    fields: Dict[str, Any] = {
         **_base_log_fields(),
         "type": "request",
         "request_id": g.request_id,
@@ -212,6 +233,7 @@ def _after_request(response):
         "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
         "user_agent": request.headers.get("User-Agent"),
     }
+
     logger.info("request", extra=fields)
 
     return response
@@ -260,15 +282,33 @@ def _parse_int_param(name: str) -> tuple[int | None, str | None]:
 
 @app.get("/add")
 def add():
-    left, err_left = _parse_int_param("left")
-    if err_left:
-        return jsonify({"error": err_left}), 400
+    with tracer.start_as_current_span("add_operation") as span:
+        try:
+            left, err_left = _parse_int_param("left")
+            if err_left:
+                span.set_status(Status(StatusCode.ERROR, err_left))
+                span.set_attribute("error", True)
+                return jsonify({"error": err_left}), 400
 
-    right, err_right = _parse_int_param("right")
-    if err_right:
-        return jsonify({"error": err_right}), 400
+            right, err_right = _parse_int_param("right")
+            if err_right:
+                span.set_status(Status(StatusCode.ERROR, err_right))
+                span.set_attribute("error", True)
+                return jsonify({"error": err_right}), 400
 
-    return jsonify({"sum": left + right}), 200
+            result = left + right
+
+            # useful attributes
+            span.set_attribute("left", left)
+            span.set_attribute("right", right)
+            span.set_attribute("result", result)
+
+            return jsonify({"sum": result}), 200
+
+        except Exception as e:
+            span.record_exception(e)
+            span.set_status(Status(StatusCode.ERROR, str(e)))
+            raise
 
 
 @app.get("/healthz")
