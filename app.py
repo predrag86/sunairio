@@ -44,21 +44,24 @@ setup_otel(app, SERVICE_NAME, ENVIRONMENT, VERSION)
 
 def setup_logging() -> None:
     handler = logging.StreamHandler(sys.stdout)
-
-    # Base JSON fields are emitted via `extra={...}` in logger calls
     formatter = jsonlogger.JsonFormatter("%(asctime)s %(levelname)s %(name)s %(message)s")
     handler.setFormatter(formatter)
 
     root = logging.getLogger()
     root.handlers = []
-    root.addHandler(handler)
     root.setLevel(LOG_LEVEL)
 
-    # Reduce noisy Flask dev server logs when running locally (gunicorn handles prod)
+    stdout_logger = logging.getLogger("stdout")
+    stdout_logger.handlers = []
+    stdout_logger.addHandler(handler)
+    stdout_logger.setLevel(LOG_LEVEL)
+    stdout_logger.propagate = False
+
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
 
 
 setup_logging()
+stdout_logger = logging.getLogger("stdout")
 logger = logging.getLogger(SERVICE_NAME)
 
 
@@ -119,7 +122,7 @@ def _base_log_fields() -> dict[str, Any]:
     }
 
 
-logger.info(
+stdout_logger.info(
     "startup",
     extra={
         **_base_log_fields(),
@@ -140,7 +143,7 @@ def _log_shutdown(reason: str) -> None:
     _shutdown_logged = True
 
     try:
-        logger.info(
+        stdout_logger.info(
             "shutdown",
             extra={
                 **_base_log_fields(),
@@ -182,7 +185,6 @@ def _before_request() -> None:
 def _after_request(response):
     duration_s = max(0.0, time.time() - g.start_time)
 
-    # --- tracing context ---
     span = trace.get_current_span()
     ctx = span.get_span_context() if span else None
 
@@ -193,14 +195,12 @@ def _after_request(response):
         trace_id = format(ctx.trace_id, "032x")
         span_id = format(ctx.span_id, "016x")
 
-    # --- automatic span status from HTTP status ---
     if span and ctx and ctx.is_valid:
         if response.status_code >= 500:
             span.set_status(Status(StatusCode.ERROR, f"HTTP {response.status_code}"))
         else:
             span.set_status(Status(StatusCode.OK))
 
-    # --- headers ---
     response.headers["X-Request-ID"] = g.request_id
 
     if trace_id:
@@ -209,11 +209,9 @@ def _after_request(response):
     if span_id:
         response.headers["X-Span-ID"] = span_id
 
-    # --- skip probe logging/metrics ---
     if request.path in ("/healthz", "/readyz", "/metrics"):
         return response
 
-    # --- metrics ---
     HTTP_REQUESTS_TOTAL.labels(
         method=request.method,
         path=request.path,
@@ -224,27 +222,6 @@ def _after_request(response):
         method=request.method,
         path=request.path,
     ).observe(duration_s)
-
-    # --- logging ---
-    duration_ms = int(duration_s * 1000)
-    fields: dict[str, Any] = {
-        **_base_log_fields(),
-        "type": "request",
-        "request_id": g.request_id,
-        "method": request.method,
-        "path": request.path,
-        "query_string": request.query_string.decode("utf-8", errors="ignore"),
-        "status": response.status_code,
-        "duration_ms": duration_ms,
-        "remote_addr": request.headers.get("X-Forwarded-For", request.remote_addr),
-        "user_agent": request.headers.get("User-Agent"),
-    }
-
-    logger.info("request", extra=fields)
-
-    return response
-
-    logger.info("request", extra=fields)
 
     return response
 
