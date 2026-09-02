@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0](https://github.com/predrag86/sunairio/compare/v1.4.0...v1.5.0) (2026-03-29)
+
+
+### Features
+
+* enable OTLP log export ([7e52e31](https://github.com/predrag86/sunairio/commit/7e52e31b0c2d8ab9b6bdbd41b81afab3029b6318))
+
+
+### Dependencies
+
+* bump types-requests in the dev-deps group ([#41](https://github.com/predrag86/sunairio/issues/41)) ([5835b5d](https://github.com/predrag86/sunairio/commit/5835b5d7f409c955e9055e0dbb3f19e9e1541c07))
+
 ## [1.4.0](https://github.com/predrag86/sunairio/compare/v1.3.1...v1.4.0) (2026-03-23)
 
 
